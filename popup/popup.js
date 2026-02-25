@@ -102,7 +102,7 @@ function renderWhitelist(list) {
   if (list.length === 0) {
     const empty = document.createElement('li');
     empty.className = 'block-blue-whitelist-empty';
-    empty.textContent = '暂无白名单用户';
+    empty.textContent = chrome.i18n.getMessage('whitelistEmpty');
     whitelistListEl.appendChild(empty);
     return;
   }
@@ -117,7 +117,7 @@ function renderWhitelist(list) {
 
     const removeBtn = document.createElement('button');
     removeBtn.textContent = '×';
-    removeBtn.title = '移除';
+    removeBtn.title = chrome.i18n.getMessage('whitelistRemove');
     removeBtn.addEventListener('click', () => {
       li.remove();
       // If list is now empty, show placeholder
@@ -207,7 +207,23 @@ async function refreshStats() {
 }
 
 // ============================================================
+// i18n
+// ============================================================
+
+/**
+ * Populate all elements with `data-i18n` attribute using chrome.i18n.
+ */
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    const msg = chrome.i18n.getMessage(key);
+    if (msg) el.textContent = msg;
+  });
+}
+
+// ============================================================
 // Init
 // ============================================================
 
+applyI18n();
 loadSettings().then(() => refreshStats());

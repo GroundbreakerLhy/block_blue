@@ -1,0 +1,73 @@
+{
+  "extName": {
+    "message": "Block Blue"
+  },
+  "extDescription": {
+    "message": "Hide Twitter/X Blue verified users from your timeline"
+  },
+  "settings": {
+    "message": "Settings"
+  },
+  "enablePlugin": {
+    "message": "Enable Plugin"
+  },
+  "blockBlue": {
+    "message": "Block Blue Users"
+  },
+  "blockGold": {
+    "message": "Block Gold Users"
+  },
+  "blockGray": {
+    "message": "Block Gray Users"
+  },
+  "whitelist": {
+    "message": "Whitelist"
+  },
+  "whitelistHint": {
+    "message": "Add users you don't want to block (followed blue users are auto-added)"
+  },
+  "whitelistAdd": {
+    "message": "Add"
+  },
+  "whitelistEmpty": {
+    "message": "No whitelisted users"
+  },
+  "whitelistRemove": {
+    "message": "Remove"
+  },
+  "statsBlocked": {
+    "message": "Blocked"
+  },
+  "statsItems": {
+    "message": "items"
+  },
+  "statsAutoDetected": {
+    "message": "Auto-detected"
+  },
+  "statsFollowedUsers": {
+    "message": "followed users"
+  },
+  "badgeBlue": {
+    "message": "Blue"
+  },
+  "badgeGold": {
+    "message": "Gold"
+  },
+  "badgeGray": {
+    "message": "Gray"
+  },
+  "badgeVerified": {
+    "message": "Verified"
+  },
+  "placeholderBlocked": {
+    "message": "$BADGE$ user content blocked",
+    "placeholders": {
+      "badge": {
+        "content": "$1"
+      }
+    }
+  },
+  "placeholderShow": {
+    "message": "Click to show"
+  }
+}

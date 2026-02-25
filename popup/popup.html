@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=360" />
@@ -22,10 +22,10 @@
 
   <!-- Settings -->
   <section class="block-blue-section">
-    <h2 class="block-blue-section-title">设置</h2>
+    <h2 class="block-blue-section-title" data-i18n="settings"></h2>
 
     <label class="block-blue-toggle">
-      <span class="block-blue-toggle-label">启用插件</span>
+      <span class="block-blue-toggle-label" data-i18n="enablePlugin"></span>
       <input type="checkbox" id="toggle-enabled" checked />
       <span class="block-blue-slider"></span>
     </label>
@@ -33,7 +33,7 @@
     <label class="block-blue-toggle">
       <span class="block-blue-toggle-label">
         <span class="block-blue-badge-dot block-blue-dot-blue"></span>
-        屏蔽蓝标用户
+        <span data-i18n="blockBlue"></span>
       </span>
       <input type="checkbox" id="toggle-blue" checked />
       <span class="block-blue-slider"></span>
@@ -42,7 +42,7 @@
     <label class="block-blue-toggle">
       <span class="block-blue-toggle-label">
         <span class="block-blue-badge-dot block-blue-dot-gold"></span>
-        屏蔽金标用户
+        <span data-i18n="blockGold"></span>
       </span>
       <input type="checkbox" id="toggle-gold" />
       <span class="block-blue-slider"></span>
@@ -51,7 +51,7 @@
     <label class="block-blue-toggle">
       <span class="block-blue-toggle-label">
         <span class="block-blue-badge-dot block-blue-dot-gray"></span>
-        屏蔽灰标用户
+        <span data-i18n="blockGray"></span>
       </span>
       <input type="checkbox" id="toggle-gray" />
       <span class="block-blue-slider"></span>
@@ -60,8 +60,8 @@
 
   <!-- Whitelist -->
   <section class="block-blue-section">
-    <h2 class="block-blue-section-title">白名单</h2>
-    <p class="block-blue-hint">添加不想屏蔽的用户（已自动添加关注的蓝标用户）</p>
+    <h2 class="block-blue-section-title" data-i18n="whitelist"></h2>
+    <p class="block-blue-hint" data-i18n="whitelistHint"></p>
 
     <div class="block-blue-whitelist-input">
       <span class="block-blue-at">@</span>
@@ -73,7 +73,7 @@
         spellcheck="false"
         autocomplete="off"
       />
-      <button id="whitelist-add" type="button">添加</button>
+      <button id="whitelist-add" type="button" data-i18n="whitelistAdd"></button>
     </div>
 
     <ul id="whitelist-list" class="block-blue-whitelist-list">
@@ -84,14 +84,14 @@
   <!-- Stats -->
   <section class="block-blue-section block-blue-stats">
     <div class="block-blue-stat-row">
-      <span>已屏蔽</span>
+      <span data-i18n="statsBlocked"></span>
       <strong id="hidden-count">0</strong>
-      <span>条内容</span>
+      <span data-i18n="statsItems"></span>
     </div>
     <div class="block-blue-stat-row block-blue-stat-secondary">
-      <span>已自动识别</span>
+      <span data-i18n="statsAutoDetected"></span>
       <strong id="auto-followed-count">0</strong>
-      <span>位关注用户</span>
+      <span data-i18n="statsFollowedUsers"></span>
     </div>
   </section>
 

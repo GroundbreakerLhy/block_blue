@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Block Blue",
-  "version": "0.1.2",
-  "description": "Hide Twitter/X Blue verified users from your timeline",
+  "name": "__MSG_extName__",
+  "version": "0.2.0",
+  "description": "__MSG_extDescription__",
+  "default_locale": "en",
   "permissions": ["storage"],
   "host_permissions": [
     "https://twitter.com/*",

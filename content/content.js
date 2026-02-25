@@ -396,9 +396,9 @@ function isOnFollowingTab() {
  * Badge-type → display label mapping.
  */
 const BADGE_LABELS = Object.freeze({
-  [BADGE_TYPES.BLUE]: '蓝标',
-  [BADGE_TYPES.GOLD]: '金标',
-  [BADGE_TYPES.GRAY]: '灰标',
+  [BADGE_TYPES.BLUE]: chrome.i18n.getMessage('badgeBlue'),
+  [BADGE_TYPES.GOLD]: chrome.i18n.getMessage('badgeGold'),
+  [BADGE_TYPES.GRAY]: chrome.i18n.getMessage('badgeGray'),
 });
 
 /**
@@ -431,15 +431,15 @@ function replaceWithPlaceholder(element, badgeType) {
   bar.appendChild(dot);
 
   // Text
-  const label = BADGE_LABELS[badgeType] || '认证';
+  const label = BADGE_LABELS[badgeType] || chrome.i18n.getMessage('badgeVerified');
   const text = document.createElement('span');
-  text.textContent = `${label}用户内容已被屏蔽`;
+  text.textContent = chrome.i18n.getMessage('placeholderBlocked', [label]);
   bar.appendChild(text);
 
   // "Show" link (visible on hover)
   const show = document.createElement('span');
   show.className = 'block-blue-placeholder-show';
-  show.textContent = '点击显示';
+  show.textContent = chrome.i18n.getMessage('placeholderShow');
   bar.appendChild(show);
 
   // Click to reveal

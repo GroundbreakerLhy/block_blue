@@ -1,0 +1,73 @@
+{
+  "extName": {
+    "message": "Block Blue"
+  },
+  "extDescription": {
+    "message": "屏蔽 Twitter/X 上蓝标认证用户的内容，还你一个清净的时间线"
+  },
+  "settings": {
+    "message": "设置"
+  },
+  "enablePlugin": {
+    "message": "启用插件"
+  },
+  "blockBlue": {
+    "message": "屏蔽蓝标用户"
+  },
+  "blockGold": {
+    "message": "屏蔽金标用户"
+  },
+  "blockGray": {
+    "message": "屏蔽灰标用户"
+  },
+  "whitelist": {
+    "message": "白名单"
+  },
+  "whitelistHint": {
+    "message": "添加不想屏蔽的用户（已自动添加关注的蓝标用户）"
+  },
+  "whitelistAdd": {
+    "message": "添加"
+  },
+  "whitelistEmpty": {
+    "message": "暂无白名单用户"
+  },
+  "whitelistRemove": {
+    "message": "移除"
+  },
+  "statsBlocked": {
+    "message": "已屏蔽"
+  },
+  "statsItems": {
+    "message": "条内容"
+  },
+  "statsAutoDetected": {
+    "message": "已自动识别"
+  },
+  "statsFollowedUsers": {
+    "message": "位关注用户"
+  },
+  "badgeBlue": {
+    "message": "蓝标"
+  },
+  "badgeGold": {
+    "message": "金标"
+  },
+  "badgeGray": {
+    "message": "灰标"
+  },
+  "badgeVerified": {
+    "message": "认证"
+  },
+  "placeholderBlocked": {
+    "message": "$BADGE$用户内容已被屏蔽",
+    "placeholders": {
+      "badge": {
+        "content": "$1"
+      }
+    }
+  },
+  "placeholderShow": {
+    "message": "点击显示"
+  }
+}
