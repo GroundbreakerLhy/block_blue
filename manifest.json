@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Block Blue",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Hide Twitter/X Blue verified users from your timeline",
   "permissions": ["storage"],
   "host_permissions": [

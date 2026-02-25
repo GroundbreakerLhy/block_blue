@@ -70,10 +70,13 @@ const settings = {
 let whitelistSet = new Set();
 
 /**
- * Auto-detected followed users (session cache).
- * Populated by scanning DOM for "Following" indicators.
+ * Auto-detected followed users (persistent cache).
+ * Populated by scanning page for "Following" indicators and from storage.
  */
 let followedUsersSet = new Set();
+
+/** Timer for debounced persist of followed users to storage */
+let followedSaveTimer = null;
 
 /** Running count of elements hidden during this page session */
 let hiddenCount = 0;
@@ -114,6 +117,14 @@ async function loadSettings() {
   settings.whitelist = Array.isArray(result.whitelist) ? result.whitelist : [];
   whitelistSet = new Set(settings.whitelist.map(u => u.toLowerCase()));
   hiddenCount = typeof result.hiddenCount === 'number' ? result.hiddenCount : 0;
+
+  // Load persisted followed-users cache from local storage
+  const local = await chrome.storage.local.get({ followedUsers: [] });
+  if (Array.isArray(local.followedUsers)) {
+    for (const u of local.followedUsers) {
+      followedUsersSet.add(u);
+    }
+  }
 }
 
 /**
@@ -217,40 +228,110 @@ function extractUsername(element) {
 // ============================================================
 
 /**
- * Check whether the logged-in user follows the author of a tweet / user-cell,
- * based on DOM cues visible inside the container.
- *
- * Signals checked (in order of reliability):
- *  1. A `<span>` or `<button>` containing "Following"-like text inside the element.
- *     (Twitter renders a "Following" button or label for followed accounts.)
- *  2. The current timeline tab is "Following" — everyone shown there is followed.
- *
- * @param {HTMLElement} element – A tweet or UserCell container
- * @returns {boolean}
+ * Persist followed users set to chrome.storage.local (debounced).
  */
-function isFollowedUser(element) {
-  // ---------- Signal 1: "Following" button / span within the element ----------
-  // Twitter uses a div/span with "Following" text, or a button with aria-label
-  // containing "Following @username" for the follow state.
-  const buttons = element.querySelectorAll(
-    '[role="button"], button, [data-testid$="-unfollow"], [data-testid$="-follow"]'
-  );
-  for (const btn of buttons) {
-    const text = (btn.textContent || '').trim().toLowerCase();
-    const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
-    const combined = text + ' ' + ariaLabel;
+function debouncedSaveFollowedUsers() {
+  if (followedSaveTimer) clearTimeout(followedSaveTimer);
+  followedSaveTimer = setTimeout(() => {
+    chrome.storage.local.set({
+      followedUsers: [...followedUsersSet],
+    });
+  }, 2000);
+}
 
-    if (FOLLOWING_KEYWORDS.some(kw => combined.includes(kw.toLowerCase()))) {
-      return true;
+/**
+ * Add a username to the followed-users cache and schedule a persist.
+ *
+ * @param {string} username – Lowercase username
+ */
+function markAsFollowed(username) {
+  if (!username || followedUsersSet.has(username)) return;
+  followedUsersSet.add(username);
+  debouncedSaveFollowedUsers();
+}
+
+/**
+ * Scan the ENTIRE visible page for follow-state signals and cache
+ * discovered followed usernames.
+ *
+ * This is called:
+ *  - On init / rescan
+ *  - Periodically while the page is active
+ *  - On MutationObserver flushes
+ *
+ * Signals scanned:
+ *  1. **Following tab**: If the active timeline tab is "Following",
+ *     every tweet author is someone the user follows.
+ *  2. **Follow buttons across the page**: Buttons / cells whose text
+ *     or aria-label says "Following" (not "Follow") — extract the
+ *     nearby username.
+ *  3. **User profile header**: If viewing `/@username`, check if the
+ *     follow button shows "Following".
+ */
+function scanPageForFollowedUsers() {
+  // ---- Signal 1: Following tab ----
+  if (isOnFollowingTab()) {
+    const tweets = document.querySelectorAll('[data-testid="tweet"]');
+    for (const tweet of tweets) {
+      const username = extractUsername(tweet);
+      if (username) markAsFollowed(username);
     }
   }
 
-  // ---------- Signal 2: "Following" tab detection ----------
-  // If user is on the "Following" tab of the home timeline, all tweets are
-  // from followed accounts.
-  if (isOnFollowingTab()) return true;
+  // ---- Signal 2: Follow buttons everywhere on the page ----
+  // Twitter renders follow/unfollow buttons with specific data-testid patterns:
+  //   data-testid="<SCREENNAME>-unfollow"  → you ARE following
+  //   data-testid="<SCREENNAME>-follow"    → you are NOT following
+  // Also look for buttons whose text/aria-label matches "Following".
+  const unfollowBtns = document.querySelectorAll('[data-testid$="-unfollow"]');
+  for (const btn of unfollowBtns) {
+    const testId = btn.getAttribute('data-testid') || '';
+    const match = testId.match(/^(.+)-unfollow$/);
+    if (match && match[1]) {
+      markAsFollowed(match[1].toLowerCase());
+    }
+  }
 
-  return false;
+  // Buttons / elements with role="button" containing "Following"-like text
+  // outside of tweet containers (e.g. UserCells, sidebar, profile header)
+  const allButtons = document.querySelectorAll(
+    '[data-testid="UserCell"] [role="button"], ' +
+    '[data-testid="placementTracking"] [role="button"], ' +
+    'aside [role="button"], ' +
+    '[data-testid="primaryColumn"] > div > div > div > div [role="button"]'
+  );
+  for (const btn of allButtons) {
+    const text = (btn.textContent || '').trim().toLowerCase();
+    const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+
+    const isFollowing = FOLLOWING_KEYWORDS.some(
+      kw => text === kw.toLowerCase() || ariaLabel.includes(kw.toLowerCase())
+    );
+    if (!isFollowing) continue;
+
+    // Walk up to find a nearby username link
+    const container = btn.closest(
+      '[data-testid="UserCell"], [data-testid="placementTracking"], aside, [data-testid="primaryColumn"]'
+    );
+    if (!container) continue;
+
+    const username = extractUsername(container);
+    if (username) markAsFollowed(username);
+  }
+
+  // ---- Signal 3: Profile page header ----
+  // URL: /username  → check the follow button in the profile header
+  const profileMatch = location.pathname.match(/^\/([a-zA-Z0-9_]{1,15})$/);
+  if (profileMatch) {
+    const profileUser = profileMatch[1].toLowerCase();
+    // Look for the unfollow data-testid on the profile
+    const profileUnfollow = document.querySelector(
+      `[data-testid="${profileMatch[1]}-unfollow"], [data-testid="${profileUser}-unfollow"]`
+    );
+    if (profileUnfollow) {
+      markAsFollowed(profileUser);
+    }
+  }
 }
 
 /**
@@ -420,14 +501,8 @@ function getBlockBadgeType(element) {
   // Manual whitelist
   if (username && whitelistSet.has(username)) return null;
 
-  // Auto-detected followed users
+  // Auto-detected followed users (from global page scan + persisted cache)
   if (username && followedUsersSet.has(username)) return null;
-
-  // Detect following status from DOM and cache it
-  if (username && isFollowedUser(element)) {
-    followedUsersSet.add(username);
-    return null;
-  }
 
   return badgeType;
 }
@@ -482,6 +557,9 @@ function rescanAll() {
   // Invalidate Following-tab cache
   _onFollowingTab = null;
 
+  // Scan page for followed users BEFORE processing tweets
+  scanPageForFollowedUsers();
+
   // Restore any placeholder-replaced elements back to original content
   document.querySelectorAll(`[${REPLACED_ATTR}]`).forEach(el => {
     restoreElement(el);
@@ -517,6 +595,9 @@ function rescanAll() {
  */
 function handleMutations(mutations) {
   if (!settings.enabled) return;
+
+  // Scan newly added content for follow-state signals
+  scanPageForFollowedUsers();
 
   for (const mutation of mutations) {
     for (const node of mutation.addedNodes) {
@@ -650,9 +731,22 @@ async function init() {
   setupUrlChangeDetection();
 
   if (settings.enabled) {
+    // Initial scan for followed users before processing tweets
+    scanPageForFollowedUsers();
     processTree(document.body);
     debouncedSaveHiddenCount();
     startObserver();
+
+    // Periodic re-scan: pick up follow state from lazy-loaded content
+    // (sidebar "Who to follow", newly scrolled UserCells, etc.)
+    setInterval(() => {
+      const sizeBefore = followedUsersSet.size;
+      scanPageForFollowedUsers();
+      // If we discovered new followed users, re-evaluate hidden tweets
+      if (followedUsersSet.size > sizeBefore) {
+        rescanAll();
+      }
+    }, 5000);
   }
 }
 
