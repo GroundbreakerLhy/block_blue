@@ -1,6 +1,21 @@
 'use strict';
 
 // ============================================================
+// Extension Context Guard
+// ============================================================
+
+/**
+ * Check whether the extension context is still valid.
+ * After an extension reload/update, the old content script remains in the page
+ * but all chrome.* APIs throw "Extension context invalidated".
+ *
+ * @returns {boolean}
+ */
+function isContextValid() {
+  return !!(chrome && chrome.runtime && chrome.runtime.id);
+}
+
+// ============================================================
 // Constants
 // ============================================================
 
@@ -109,6 +124,7 @@ const DEFAULT_SETTINGS = Object.freeze({
  * @returns {Promise<void>}
  */
 async function loadSettings() {
+  if (!isContextValid()) return;
   const result = await chrome.storage.sync.get(DEFAULT_SETTINGS);
   settings.enabled = result.enabled;
   settings.hideBlue = result.hideBlue;
@@ -119,6 +135,7 @@ async function loadSettings() {
   hiddenCount = typeof result.hiddenCount === 'number' ? result.hiddenCount : 0;
 
   // Load persisted followed-users cache from local storage
+  if (!isContextValid()) return;
   const local = await chrome.storage.local.get({ followedUsers: [] });
   if (Array.isArray(local.followedUsers)) {
     for (const u of local.followedUsers) {
@@ -133,6 +150,7 @@ async function loadSettings() {
 function debouncedSaveHiddenCount() {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
+    if (!isContextValid()) return;
     chrome.storage.sync.set({ hiddenCount });
   }, 1000);
 }
@@ -233,6 +251,7 @@ function extractUsername(element) {
 function debouncedSaveFollowedUsers() {
   if (followedSaveTimer) clearTimeout(followedSaveTimer);
   followedSaveTimer = setTimeout(() => {
+    if (!isContextValid()) return;
     chrome.storage.local.set({
       followedUsers: [...followedUsersSet],
     });
@@ -594,7 +613,7 @@ function rescanAll() {
  * @param {MutationRecord[]} mutations
  */
 function handleMutations(mutations) {
-  if (!settings.enabled) return;
+  if (!settings.enabled || !isContextValid()) return;
 
   // Scan newly added content for follow-state signals
   scanPageForFollowedUsers();
@@ -677,6 +696,7 @@ function setupUrlChangeDetection() {
  * Respond to messages from the popup or background service worker.
  */
 function setupMessageListener() {
+  if (!isContextValid()) return;
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'GET_STATS') {
       sendResponse({
@@ -704,6 +724,7 @@ function setupMessageListener() {
  * React to setting changes made in other tabs or by the popup.
  */
 function setupStorageListener() {
+  if (!isContextValid()) return;
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync') return;
 
@@ -723,6 +744,7 @@ function setupStorageListener() {
  * Entry point — load settings, wire up listeners, perform the first scan.
  */
 async function init() {
+  if (!isContextValid()) return;
   await loadSettings();
 
   // Listeners are always active so the plugin can be toggled at runtime
@@ -740,6 +762,7 @@ async function init() {
     // Periodic re-scan: pick up follow state from lazy-loaded content
     // (sidebar "Who to follow", newly scrolled UserCells, etc.)
     setInterval(() => {
+      if (!isContextValid()) return;
       const sizeBefore = followedUsersSet.size;
       scanPageForFollowedUsers();
       // If we discovered new followed users, re-evaluate hidden tweets
