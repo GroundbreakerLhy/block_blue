@@ -1,0 +1,74 @@
+/*
+ * Block Blue — content stylesheet
+ *
+ * Instead of hiding tweets entirely, the original content is replaced with
+ * a slim grey placeholder bar that tells the user it was blocked.
+ */
+
+/* ---- Placeholder bar (replaces tweet content) ---- */
+
+.block-blue-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  background: rgba(134, 150, 160, 0.08);
+  border-radius: 8px;
+  color: #8b98a5;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  line-height: 1.4;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+  border: 1px solid rgba(134, 150, 160, 0.12);
+  box-sizing: border-box;
+}
+
+.block-blue-placeholder:hover {
+  background: rgba(134, 150, 160, 0.16);
+}
+
+/* Small shield / badge icon inside the placeholder */
+.block-blue-placeholder-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  opacity: 0.55;
+}
+
+/* Badge type label dot */
+.block-blue-placeholder-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.block-blue-placeholder-dot--blue  { background: #1d9bf0; }
+.block-blue-placeholder-dot--gold  { background: #e5af1d; }
+.block-blue-placeholder-dot--gray  { background: #829aab; }
+
+/* "Show" link within the bar */
+.block-blue-placeholder-show {
+  margin-left: 4px;
+  color: #1d9bf0;
+  font-size: 12px;
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.block-blue-placeholder:hover .block-blue-placeholder-show {
+  opacity: 1;
+}
+
+/* The original tweet wrapper when replaced — hide overflow & hold placeholder */
+[data-block-blue-replaced="true"] {
+  padding: 4px 16px !important;
+  overflow: hidden !important;
+}

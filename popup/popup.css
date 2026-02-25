@@ -1,0 +1,295 @@
+/* ==========================================================
+   Block Blue — Popup Stylesheet
+   Dark theme matching Twitter/X aesthetic
+   ========================================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 320px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  background: #15202b;
+  color: #e7e9ea;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* ---- Header ---- */
+
+.block-blue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #38444d;
+}
+
+.block-blue-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1d9bf0;
+}
+
+.block-blue-logo h1 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e7e9ea;
+}
+
+.block-blue-version {
+  font-size: 11px;
+  color: #8899a6;
+}
+
+/* ---- Sections ---- */
+
+.block-blue-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid #38444d;
+}
+
+.block-blue-section:last-child {
+  border-bottom: none;
+}
+
+.block-blue-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #8899a6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+/* ---- Toggle Switches ---- */
+
+.block-blue-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.block-blue-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+/* Badge colour dots */
+.block-blue-badge-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.block-blue-dot-blue {
+  background: #1d9bf0;
+}
+
+.block-blue-dot-gold {
+  background: #e5af1d;
+}
+
+.block-blue-dot-gray {
+  background: #829aab;
+}
+
+/* The actual toggle switch */
+.block-blue-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.block-blue-slider {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  background: #38444d;
+  border-radius: 11px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.block-blue-slider::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: #8899a6;
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.block-blue-toggle input:checked + .block-blue-slider {
+  background: #1d9bf0;
+}
+
+.block-blue-toggle input:checked + .block-blue-slider::after {
+  transform: translateX(18px);
+  background: #fff;
+}
+
+/* ---- Whitelist ---- */
+
+.block-blue-hint {
+  font-size: 12px;
+  color: #8899a6;
+  margin-bottom: 10px;
+}
+
+.block-blue-whitelist-input {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 8px;
+}
+
+.block-blue-at {
+  background: #192734;
+  color: #8899a6;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid #38444d;
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.block-blue-whitelist-input input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #38444d;
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+  background: #192734;
+  color: #e7e9ea;
+  font-size: 14px;
+  outline: none;
+  line-height: 1.4;
+}
+
+.block-blue-whitelist-input input::placeholder {
+  color: #556874;
+}
+
+.block-blue-whitelist-input input:focus {
+  border-color: #1d9bf0;
+}
+
+.block-blue-whitelist-input button {
+  padding: 6px 12px;
+  background: #1d9bf0;
+  color: #fff;
+  border: 1px solid #1d9bf0;
+  border-radius: 0 6px 6px 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: background 0.15s;
+}
+
+.block-blue-whitelist-input button:hover {
+  background: #1a8cd8;
+}
+
+.block-blue-whitelist-input button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.block-blue-whitelist-list {
+  list-style: none;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.block-blue-whitelist-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.block-blue-whitelist-list::-webkit-scrollbar-thumb {
+  background: #38444d;
+  border-radius: 2px;
+}
+
+.block-blue-whitelist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 13px;
+}
+
+.block-blue-whitelist-item span {
+  color: #1d9bf0;
+}
+
+.block-blue-whitelist-item button {
+  background: none;
+  border: none;
+  color: #f4212e;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.block-blue-whitelist-item button:hover {
+  opacity: 1;
+}
+
+.block-blue-whitelist-empty {
+  color: #556874;
+  font-size: 12px;
+  text-align: center;
+  padding: 8px 0;
+}
+
+/* ---- Stats ---- */
+
+.block-blue-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #8899a6;
+}
+
+.block-blue-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.block-blue-stat-secondary {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.block-blue-stats strong {
+  color: #1d9bf0;
+  font-size: 16px;
+}
+
+.block-blue-stat-secondary strong {
+  font-size: 13px;
+}
