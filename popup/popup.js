@@ -11,7 +11,8 @@ const toggleGray = document.getElementById('toggle-gray');
 
 const whitelistInput = document.getElementById('whitelist-input');
 const whitelistAddBtn = document.getElementById('whitelist-add');
-const whitelistListEl = document.getElementById('whitelist-list');
+const whitelistRemoveInput = document.getElementById('whitelist-remove-input');
+const whitelistRemoveBtn = document.getElementById('whitelist-remove-btn');
 
 const hiddenCountEl = document.getElementById('hidden-count');
 
@@ -28,6 +29,9 @@ const DEFAULT_SETTINGS = Object.freeze({
   hiddenCount: 0,
 });
 
+/** In-memory copy of the whitelist array. */
+let currentWhitelist = [];
+
 // ============================================================
 // Settings Load / Save
 // ============================================================
@@ -43,7 +47,7 @@ async function loadSettings() {
   toggleGold.checked = data.hideGold;
   toggleGray.checked = data.hideGray;
 
-  renderWhitelist(Array.isArray(data.whitelist) ? data.whitelist : []);
+  currentWhitelist = Array.isArray(data.whitelist) ? data.whitelist : [];
   hiddenCountEl.textContent = data.hiddenCount || 0;
 }
 
@@ -51,14 +55,12 @@ async function loadSettings() {
  * Persist current UI state back to storage and notify content scripts.
  */
 async function saveSettings() {
-  const whitelist = getCurrentWhitelist();
-
   await chrome.storage.sync.set({
     enabled: toggleEnabled.checked,
     hideBlue: toggleBlue.checked,
     hideGold: toggleGold.checked,
     hideGray: toggleGray.checked,
-    whitelist,
+    whitelist: currentWhitelist,
   });
 
   // Notify active tab's content script that settings changed
@@ -84,63 +86,12 @@ async function notifyContentScript() {
 // ============================================================
 
 /**
- * Read the current whitelist from the DOM list.
- * @returns {string[]}
- */
-function getCurrentWhitelist() {
-  const items = whitelistListEl.querySelectorAll('.block-blue-whitelist-item');
-  return Array.from(items).map(li => li.dataset.username);
-}
-
-/**
- * Render the whitelist <ul> from an array of usernames.
- * @param {string[]} list
- */
-function renderWhitelist(list) {
-  whitelistListEl.innerHTML = '';
-
-  if (list.length === 0) {
-    const empty = document.createElement('li');
-    empty.className = 'block-blue-whitelist-empty';
-    empty.textContent = chrome.i18n.getMessage('whitelistEmpty');
-    whitelistListEl.appendChild(empty);
-    return;
-  }
-
-  for (const username of list) {
-    const li = document.createElement('li');
-    li.className = 'block-blue-whitelist-item';
-    li.dataset.username = username;
-
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = `@${username}`;
-
-    const removeBtn = document.createElement('button');
-    removeBtn.textContent = '×';
-    removeBtn.title = chrome.i18n.getMessage('whitelistRemove');
-    removeBtn.addEventListener('click', () => {
-      li.remove();
-      // If list is now empty, show placeholder
-      if (whitelistListEl.children.length === 0) {
-        renderWhitelist([]);
-      }
-      saveSettings();
-    });
-
-    li.appendChild(nameSpan);
-    li.appendChild(removeBtn);
-    whitelistListEl.appendChild(li);
-  }
-}
-
-/**
  * Add a username to the whitelist (from the input field).
  */
 function addToWhitelist() {
   const raw = whitelistInput.value.trim().replace(/^@/, '');
   if (!raw) return;
 
-  // Validate: Twitter usernames are 1-15 alphanumeric + underscore
   if (!/^[a-zA-Z0-9_]{1,15}$/.test(raw)) {
     whitelistInput.classList.add('block-blue-input-error');
     setTimeout(() => whitelistInput.classList.remove('block-blue-input-error'), 600);
@@ -148,17 +99,35 @@ function addToWhitelist() {
   }
 
   const username = raw.toLowerCase();
-  const current = getCurrentWhitelist();
 
-  // No duplicates
-  if (current.includes(username)) {
+  if (currentWhitelist.includes(username)) {
     whitelistInput.value = '';
     return;
   }
 
-  current.push(username);
-  renderWhitelist(current);
+  currentWhitelist.push(username);
   whitelistInput.value = '';
+  saveSettings();
+}
+
+/**
+ * Remove a username from the whitelist (from the remove input field).
+ */
+function removeFromWhitelistByInput() {
+  const raw = whitelistRemoveInput.value.trim().replace(/^@/, '');
+  if (!raw) return;
+
+  const username = raw.toLowerCase();
+  const idx = currentWhitelist.indexOf(username);
+
+  if (idx === -1) {
+    whitelistRemoveInput.classList.add('block-blue-input-error');
+    setTimeout(() => whitelistRemoveInput.classList.remove('block-blue-input-error'), 600);
+    return;
+  }
+
+  currentWhitelist.splice(idx, 1);
+  whitelistRemoveInput.value = '';
   saveSettings();
 }
 
@@ -172,9 +141,14 @@ toggleGold.addEventListener('change', saveSettings);
 toggleGray.addEventListener('change', saveSettings);
 
 whitelistAddBtn.addEventListener('click', addToWhitelist);
+whitelistRemoveBtn.addEventListener('click', removeFromWhitelistByInput);
 
 whitelistInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') addToWhitelist();
+});
+
+whitelistRemoveInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') removeFromWhitelistByInput();
 });
 
 // ============================================================
@@ -195,10 +169,6 @@ async function refreshStats() {
     .then(response => {
       if (response && typeof response.hiddenCount === 'number') {
         hiddenCountEl.textContent = response.hiddenCount;
-      }
-      if (response && typeof response.autoFollowedCount === 'number') {
-        const el = document.getElementById('auto-followed-count');
-        if (el) el.textContent = response.autoFollowedCount;
       }
     })
     .catch(() => {

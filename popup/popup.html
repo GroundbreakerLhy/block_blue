@@ -17,7 +17,6 @@
       </svg>
       <h1>Block Blue</h1>
     </div>
-    <span class="block-blue-version">v0.1.0-beta</span>
   </header>
 
   <!-- Settings -->
@@ -76,9 +75,18 @@
       <button id="whitelist-add" type="button" data-i18n="whitelistAdd"></button>
     </div>
 
-    <ul id="whitelist-list" class="block-blue-whitelist-list">
-      <!-- populated by popup.js -->
-    </ul>
+    <div class="block-blue-whitelist-input">
+      <span class="block-blue-at">@</span>
+      <input
+        type="text"
+        id="whitelist-remove-input"
+        placeholder="username"
+        maxlength="15"
+        spellcheck="false"
+        autocomplete="off"
+      />
+      <button id="whitelist-remove-btn" type="button" class="block-blue-btn-remove" data-i18n="whitelistRemove"></button>
+    </div>
   </section>
 
   <!-- Stats -->
@@ -87,11 +95,6 @@
       <span data-i18n="statsBlocked"></span>
       <strong id="hidden-count">0</strong>
       <span data-i18n="statsItems"></span>
-    </div>
-    <div class="block-blue-stat-row block-blue-stat-secondary">
-      <span data-i18n="statsAutoDetected"></span>
-      <strong id="auto-followed-count">0</strong>
-      <span data-i18n="statsFollowedUsers"></span>
     </div>
   </section>
 
