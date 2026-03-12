@@ -14,8 +14,5 @@
 
 ## 安装
 
-1. 下载或 `git clone` 本仓库
-2. 打开 `chrome://extensions/`（Edge 用户打开 `edge://extensions/`）
-3. 开启右上角 **开发者模式**
-4. 点击 **加载已解压的扩展程序**，选择 `block_blue` 文件夹
-5. 第一次使用插件时需要进入 following 页签加载已关注用户列表，之后插件会自动识别你关注的蓝标用户不予屏蔽
+1. 从 [Egde 插件商店](https://microsoftedge.microsoft.com/addons/detail/block-blue/peoljgmnhodgbaanpkpihomacemccfhj) 安装 Block Blue
+2. 第一次使用插件时需要进入 following 页签加载已关注用户列表，之后插件会自动识别你关注的蓝标用户不予屏蔽
