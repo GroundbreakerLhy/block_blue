@@ -81,17 +81,8 @@ const settings = {
   whitelist: [],
 };
 
-/** Manual whitelist stored as a Set for O(1) lookup (lowercase usernames) */
+/** Whitelist stored as a Set for O(1) lookup (lowercase usernames) */
 let whitelistSet = new Set();
-
-/**
- * Auto-detected followed users (persistent cache).
- * Populated by scanning page for "Following" indicators and from storage.
- */
-let followedUsersSet = new Set();
-
-/** Timer for debounced persist of followed users to storage */
-let followedSaveTimer = null;
 
 /** Running count of elements hidden during this page session */
 let hiddenCount = 0;
@@ -101,6 +92,9 @@ let observer = null;
 
 /** Timer id for batched storage writes of hiddenCount */
 let saveTimer = null;
+
+/** Flag to skip onChanged events triggered by our own whitelist saves */
+let _selfSavingWhitelist = false;
 
 // ============================================================
 // Default settings (also used as keys for chrome.storage.sync)
@@ -133,15 +127,6 @@ async function loadSettings() {
   settings.whitelist = Array.isArray(result.whitelist) ? result.whitelist : [];
   whitelistSet = new Set(settings.whitelist.map(u => u.toLowerCase()));
   hiddenCount = typeof result.hiddenCount === 'number' ? result.hiddenCount : 0;
-
-  // Load persisted followed-users cache from local storage
-  if (!isContextValid()) return;
-  const local = await chrome.storage.local.get({ followedUsers: [] });
-  if (Array.isArray(local.followedUsers)) {
-    for (const u of local.followedUsers) {
-      followedUsersSet.add(u);
-    }
-  }
 }
 
 /**
@@ -242,150 +227,140 @@ function extractUsername(element) {
 }
 
 // ============================================================
-// Following Detection
+// Following Detection & Whitelist Sync
 // ============================================================
 
 /**
- * Persist followed users set to chrome.storage.local (debounced).
+ * Save whitelist to chrome.storage.sync immediately.
  */
-function debouncedSaveFollowedUsers() {
-  if (followedSaveTimer) clearTimeout(followedSaveTimer);
-  followedSaveTimer = setTimeout(() => {
-    if (!isContextValid()) return;
-    chrome.storage.local.set({
-      followedUsers: [...followedUsersSet],
-    });
-  }, 2000);
+function saveWhitelistNow() {
+  if (!isContextValid()) return;
+  _selfSavingWhitelist = true;
+  chrome.storage.sync.set({ whitelist: settings.whitelist }, () => {
+    _selfSavingWhitelist = false;
+  });
 }
 
 /**
- * Add a username to the followed-users cache and schedule a persist.
- *
+ * Add a username to the whitelist (if not already present).
  * @param {string} username – Lowercase username
+ * @returns {boolean} Whether a new entry was added.
  */
-function markAsFollowed(username) {
-  if (!username || followedUsersSet.has(username)) return;
-  followedUsersSet.add(username);
-  debouncedSaveFollowedUsers();
+function addToWhitelist(username) {
+  if (!username || whitelistSet.has(username)) return false;
+  whitelistSet.add(username);
+  settings.whitelist.push(username);
+  return true;
 }
 
 /**
- * Scan the ENTIRE visible page for follow-state signals and cache
- * discovered followed usernames.
- *
- * This is called:
- *  - On init / rescan
- *  - Periodically while the page is active
- *  - On MutationObserver flushes
- *
- * Signals scanned:
- *  1. **Following tab**: If the active timeline tab is "Following",
- *     every tweet author is someone the user follows.
- *  2. **Follow buttons across the page**: Buttons / cells whose text
- *     or aria-label says "Following" (not "Follow") — extract the
- *     nearby username.
- *  3. **User profile header**: If viewing `/@username`, check if the
- *     follow button shows "Following".
+ * Remove a username from the whitelist.
+ * @param {string} username – Lowercase username
+ * @returns {boolean} Whether the entry existed and was removed.
  */
-function scanPageForFollowedUsers() {
-  // ---- Signal 1: Following tab ----
-  if (isOnFollowingTab()) {
-    const tweets = document.querySelectorAll('[data-testid="tweet"]');
-    for (const tweet of tweets) {
-      const username = extractUsername(tweet);
-      if (username) markAsFollowed(username);
-    }
-  }
-
-  // ---- Signal 2: Follow buttons everywhere on the page ----
-  // Twitter renders follow/unfollow buttons with specific data-testid patterns:
-  //   data-testid="<SCREENNAME>-unfollow"  → you ARE following
-  //   data-testid="<SCREENNAME>-follow"    → you are NOT following
-  // Also look for buttons whose text/aria-label matches "Following".
-  const unfollowBtns = document.querySelectorAll('[data-testid$="-unfollow"]');
-  for (const btn of unfollowBtns) {
-    const testId = btn.getAttribute('data-testid') || '';
-    const match = testId.match(/^(.+)-unfollow$/);
-    if (match && match[1]) {
-      markAsFollowed(match[1].toLowerCase());
-    }
-  }
-
-  // Buttons / elements with role="button" containing "Following"-like text
-  // outside of tweet containers (e.g. UserCells, sidebar, profile header)
-  const allButtons = document.querySelectorAll(
-    '[data-testid="UserCell"] [role="button"], ' +
-    '[data-testid="placementTracking"] [role="button"], ' +
-    'aside [role="button"], ' +
-    '[data-testid="primaryColumn"] > div > div > div > div [role="button"]'
-  );
-  for (const btn of allButtons) {
-    const text = (btn.textContent || '').trim().toLowerCase();
-    const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
-
-    const isFollowing = FOLLOWING_KEYWORDS.some(
-      kw => text === kw.toLowerCase() || ariaLabel.includes(kw.toLowerCase())
-    );
-    if (!isFollowing) continue;
-
-    // Walk up to find a nearby username link
-    const container = btn.closest(
-      '[data-testid="UserCell"], [data-testid="placementTracking"], aside, [data-testid="primaryColumn"]'
-    );
-    if (!container) continue;
-
-    const username = extractUsername(container);
-    if (username) markAsFollowed(username);
-  }
-
-  // ---- Signal 3: Profile page header ----
-  // URL: /username  → check the follow button in the profile header
-  const profileMatch = location.pathname.match(/^\/([a-zA-Z0-9_]{1,15})$/);
-  if (profileMatch) {
-    const profileUser = profileMatch[1].toLowerCase();
-    // Look for the unfollow data-testid on the profile
-    const profileUnfollow = document.querySelector(
-      `[data-testid="${profileMatch[1]}-unfollow"], [data-testid="${profileUser}-unfollow"]`
-    );
-    if (profileUnfollow) {
-      markAsFollowed(profileUser);
-    }
-  }
+function removeFromWhitelist(username) {
+  if (!username || !whitelistSet.has(username)) return false;
+  whitelistSet.delete(username);
+  settings.whitelist = settings.whitelist.filter(u => u !== username);
+  return true;
 }
 
 /**
- * Cache flag for the "Following" tab check (refreshed on URL change).
- * null = not yet checked; true/false = cached result.
- */
-let _onFollowingTab = null;
-
-/**
- * Detect if the user is on the "Following" tab of the home timeline.
- * Reads from a cached value that is cleared on URL changes.
+ * Check whether a specific element (tweet / UserCell) contains indicators
+ * that the author is being followed by the logged-in user.
  *
+ * @param {HTMLElement} element
  * @returns {boolean}
  */
-function isOnFollowingTab() {
-  if (_onFollowingTab !== null) return _onFollowingTab;
+function isFollowedInElement(element) {
+  // Unfollow button inside this element
+  if (element.querySelector('[data-testid$="-unfollow"]')) return true;
 
-  // Only applies to the home page
-  if (!/^\/(home)?$/.test(location.pathname)) {
-    _onFollowingTab = false;
-    return false;
-  }
-
-  // The active tab has aria-selected="true"
-  const tabs = document.querySelectorAll('[role="tab"][aria-selected="true"]');
-  for (const tab of tabs) {
-    const text = (tab.textContent || '').trim().toLowerCase();
-    if (FOLLOWING_KEYWORDS.some(kw => text.includes(kw.toLowerCase()))) {
-      _onFollowingTab = true;
+  // Button whose text matches "Following" keywords (works on UserCells)
+  const buttons = element.querySelectorAll('[role="button"]');
+  for (const btn of buttons) {
+    const text = (btn.textContent || '').trim().toLowerCase();
+    if (FOLLOWING_KEYWORDS.some(kw => text === kw.toLowerCase())) {
       return true;
     }
   }
 
-  _onFollowingTab = false;
   return false;
+}
+
+/**
+ * Check whether an unfollow button for this username exists anywhere
+ * on the current page (sidebar, profile header, other UserCells).
+ *
+ * @param {string} username – Lowercase username
+ * @returns {boolean}
+ */
+function isFollowedOnPage(username) {
+  return !!document.querySelector(`[data-testid="${username}-unfollow"]`);
+}
+
+/**
+ * Detect if the user is on the "Following" tab of the home timeline.
+ *
+ * @returns {boolean}
+ */
+function isOnFollowingTab() {
+  if (!/^\/(home)?$/.test(location.pathname)) return false;
+
+  const tabs = document.querySelectorAll('[role="tab"][aria-selected="true"]');
+  for (const tab of tabs) {
+    const text = (tab.textContent || '').trim().toLowerCase();
+    if (FOLLOWING_KEYWORDS.some(kw => text.includes(kw.toLowerCase()))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Listen for clicks on follow/unfollow buttons to detect real-time
+ * follow/unfollow actions by the user.
+ */
+function setupFollowClickListener() {
+  document.addEventListener('click', (e) => {
+    // Detect click on an unfollow button → user is about to unfollow
+    const unfollowBtn = e.target.closest('[data-testid$="-unfollow"]');
+    if (unfollowBtn) {
+      const match = (unfollowBtn.getAttribute('data-testid') || '').match(/^(.+)-unfollow$/);
+      if (match?.[1]) {
+        const username = match[1].toLowerCase();
+        // Twitter shows a confirmation dialog; wait for it to be dismissed
+        setTimeout(() => {
+          if (!isContextValid()) return;
+          // If the unfollow button is gone → unfollow was confirmed
+          if (!document.querySelector(
+            `[data-testid="${match[1]}-unfollow"], [data-testid="${username}-unfollow"]`
+          )) {
+            if (removeFromWhitelist(username)) {
+              saveWhitelistNow();
+              rescanAll();
+            }
+          }
+        }, 2000);
+      }
+      return;
+    }
+
+    // Detect click on a follow button → user is about to follow
+    const followBtn = e.target.closest('[data-testid$="-follow"]:not([data-testid$="-unfollow"])');
+    if (followBtn) {
+      const match = (followBtn.getAttribute('data-testid') || '').match(/^(.+)-follow$/);
+      if (match?.[1]) {
+        const username = match[1].toLowerCase();
+        // Follow is instant (no dialog) — save immediately
+        if (addToWhitelist(username)) {
+          saveWhitelistNow();
+          rescanAll();
+        }
+      }
+    }
+  }, true);
 }
 
 // ============================================================
@@ -514,14 +489,29 @@ function getBlockBadgeType(element) {
   if (badgeType === BADGE_TYPES.GOLD && !settings.hideGold) return null;
   if (badgeType === BADGE_TYPES.GRAY && !settings.hideGray) return null;
 
-  // --- Whitelist checks ---
+  // --- Whitelist check ---
   const username = extractUsername(element);
-
-  // Manual whitelist
   if (username && whitelistSet.has(username)) return null;
 
-  // Auto-detected followed users (from global page scan + persisted cache)
-  if (username && followedUsersSet.has(username)) return null;
+  // --- Real-time follow detection (at processing time) ---
+  if (username) {
+    let followed = false;
+
+    // On the Following tab, every tweet author is someone we follow
+    if (isOnFollowingTab()) followed = true;
+
+    // This element itself has follow-state indicators (e.g. UserCell)
+    if (!followed && isFollowedInElement(element)) followed = true;
+
+    // There's an unfollow button for this user elsewhere on the page
+    if (!followed && isFollowedOnPage(username)) followed = true;
+
+    if (followed) {
+      addToWhitelist(username);
+      saveWhitelistNow();
+      return null;
+    }
+  }
 
   return badgeType;
 }
@@ -573,12 +563,6 @@ function processTree(root) {
  * Clear all processing markers and re-evaluate every container on the page.
  */
 function rescanAll() {
-  // Invalidate Following-tab cache
-  _onFollowingTab = null;
-
-  // Scan page for followed users BEFORE processing tweets
-  scanPageForFollowedUsers();
-
   // Restore any placeholder-replaced elements back to original content
   document.querySelectorAll(`[${REPLACED_ATTR}]`).forEach(el => {
     restoreElement(el);
@@ -614,9 +598,6 @@ function rescanAll() {
  */
 function handleMutations(mutations) {
   if (!settings.enabled || !isContextValid()) return;
-
-  // Scan newly added content for follow-state signals
-  scanPageForFollowedUsers();
 
   for (const mutation of mutations) {
     for (const node of mutation.addedNodes) {
@@ -666,8 +647,6 @@ function setupUrlChangeDetection() {
   const onUrlChange = () => {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
-      // Invalidate Following-tab cache on navigation
-      _onFollowingTab = null;
       // Give the new view a moment to render before rescanning
       setTimeout(rescanAll, 500);
     }
@@ -699,10 +678,7 @@ function setupMessageListener() {
   if (!isContextValid()) return;
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'GET_STATS') {
-      sendResponse({
-        hiddenCount,
-        autoFollowedCount: followedUsersSet.size,
-      });
+      sendResponse({ hiddenCount });
       return true; // keep channel open for async response
     }
 
@@ -728,9 +704,10 @@ function setupStorageListener() {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync') return;
 
-    // Avoid a feedback loop: if only hiddenCount changed, ignore it
     const keys = Object.keys(changes);
+    // Skip internal saves (hiddenCount or our own whitelist sync)
     if (keys.length === 1 && keys[0] === 'hiddenCount') return;
+    if (_selfSavingWhitelist && keys.length === 1 && keys[0] === 'whitelist') return;
 
     loadSettings().then(() => rescanAll());
   });
@@ -747,29 +724,27 @@ async function init() {
   if (!isContextValid()) return;
   await loadSettings();
 
+  // One-time migration: merge old followed-users cache into unified whitelist
+  const local = await chrome.storage.local.get({ followedUsers: [] });
+  if (Array.isArray(local.followedUsers) && local.followedUsers.length > 0) {
+    let migrated = false;
+    for (const u of local.followedUsers) {
+      if (addToWhitelist(u)) migrated = true;
+    }
+    if (migrated) saveWhitelistNow();
+    chrome.storage.local.remove('followedUsers');
+  }
+
   // Listeners are always active so the plugin can be toggled at runtime
   setupMessageListener();
   setupStorageListener();
   setupUrlChangeDetection();
+  setupFollowClickListener();
 
   if (settings.enabled) {
-    // Initial scan for followed users before processing tweets
-    scanPageForFollowedUsers();
     processTree(document.body);
     debouncedSaveHiddenCount();
     startObserver();
-
-    // Periodic re-scan: pick up follow state from lazy-loaded content
-    // (sidebar "Who to follow", newly scrolled UserCells, etc.)
-    setInterval(() => {
-      if (!isContextValid()) return;
-      const sizeBefore = followedUsersSet.size;
-      scanPageForFollowedUsers();
-      // If we discovered new followed users, re-evaluate hidden tweets
-      if (followedUsersSet.size > sizeBefore) {
-        rescanAll();
-      }
-    }, 5000);
   }
 }
 
