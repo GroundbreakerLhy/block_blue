@@ -114,6 +114,15 @@ const DEFAULT_SETTINGS = Object.freeze({
 // ============================================================
 
 /**
+ * Keep whitelist order stable for storage consistency.
+ * @param {string[]} list
+ * @returns {string[]}
+ */
+function sortWhitelist(list) {
+  return [...list].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+}
+
+/**
  * Load settings from chrome.storage.sync and refresh local state.
  * @returns {Promise<void>}
  */
@@ -124,7 +133,7 @@ async function loadSettings() {
   settings.hideBlue = result.hideBlue;
   settings.hideGold = result.hideGold;
   settings.hideGray = result.hideGray;
-  settings.whitelist = Array.isArray(result.whitelist) ? result.whitelist : [];
+  settings.whitelist = sortWhitelist(Array.isArray(result.whitelist) ? result.whitelist : []);
   whitelistSet = new Set(settings.whitelist.map(u => u.toLowerCase()));
   hiddenCount = typeof result.hiddenCount === 'number' ? result.hiddenCount : 0;
 }
@@ -250,6 +259,7 @@ function addToWhitelist(username) {
   if (!username || whitelistSet.has(username)) return false;
   whitelistSet.add(username);
   settings.whitelist.push(username);
+  settings.whitelist = sortWhitelist(settings.whitelist);
   return true;
 }
 
@@ -262,6 +272,7 @@ function removeFromWhitelist(username) {
   if (!username || !whitelistSet.has(username)) return false;
   whitelistSet.delete(username);
   settings.whitelist = settings.whitelist.filter(u => u !== username);
+  settings.whitelist = sortWhitelist(settings.whitelist);
   return true;
 }
 
@@ -685,6 +696,14 @@ function setupMessageListener() {
     if (message.type === 'SETTINGS_CHANGED') {
       loadSettings().then(() => rescanAll());
       sendResponse({ ok: true });
+      return true;
+    }
+
+    if (message.type === 'GET_SELF_USERNAME') {
+      const profileLink = document.querySelector('a[data-testid="AppTabBar_Profile_Link"][href]');
+      const href = profileLink ? profileLink.getAttribute('href') : '';
+      const match = href ? href.match(/^\/([a-zA-Z0-9_]{1,15})$/) : null;
+      sendResponse({ username: match ? match[1].toLowerCase() : null });
       return true;
     }
 

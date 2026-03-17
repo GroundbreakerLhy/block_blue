@@ -13,6 +13,11 @@ const whitelistInput = document.getElementById('whitelist-input');
 const whitelistAddBtn = document.getElementById('whitelist-add');
 const whitelistRemoveInput = document.getElementById('whitelist-remove-input');
 const whitelistRemoveBtn = document.getElementById('whitelist-remove-btn');
+const whitelistViewBtn = document.getElementById('whitelist-view-btn');
+const whitelistResetBtn = document.getElementById('whitelist-reset-btn');
+const whitelistModal = document.getElementById('whitelist-modal');
+const whitelistModalContent = document.getElementById('whitelist-modal-content');
+const whitelistModalCloseBtn = document.getElementById('whitelist-modal-close');
 
 const hiddenCountEl = document.getElementById('hidden-count');
 
@@ -32,6 +37,13 @@ const DEFAULT_SETTINGS = Object.freeze({
 /** In-memory copy of the whitelist array. */
 let currentWhitelist = [];
 
+/**
+ * Keep whitelist order stable for display and storage.
+ */
+function sortWhitelist(list) {
+  return [...list].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+}
+
 // ============================================================
 // Settings Load / Save
 // ============================================================
@@ -47,7 +59,7 @@ async function loadSettings() {
   toggleGold.checked = data.hideGold;
   toggleGray.checked = data.hideGray;
 
-  currentWhitelist = Array.isArray(data.whitelist) ? data.whitelist : [];
+  currentWhitelist = sortWhitelist(Array.isArray(data.whitelist) ? data.whitelist : []);
   hiddenCountEl.textContent = data.hiddenCount || 0;
 }
 
@@ -55,6 +67,8 @@ async function loadSettings() {
  * Persist current UI state back to storage and notify content scripts.
  */
 async function saveSettings() {
+  currentWhitelist = sortWhitelist(currentWhitelist);
+
   await chrome.storage.sync.set({
     enabled: toggleEnabled.checked,
     hideBlue: toggleBlue.checked,
@@ -106,6 +120,7 @@ function addToWhitelist() {
   }
 
   currentWhitelist.push(username);
+  currentWhitelist = sortWhitelist(currentWhitelist);
   whitelistInput.value = '';
   saveSettings();
 }
@@ -131,6 +146,70 @@ function removeFromWhitelistByInput() {
   saveSettings();
 }
 
+/**
+ * Show current whitelist entries in a dialog.
+ */
+function viewWhitelist() {
+  if (currentWhitelist.length === 0) {
+    const emptyMsg = chrome.i18n.getMessage('whitelistViewEmpty') || 'Whitelist is empty.';
+    window.alert(emptyMsg);
+    return;
+  }
+
+  const listText = currentWhitelist.map(username => `@${username}`).join('\n');
+  whitelistModalContent.textContent = listText;
+  whitelistModal.hidden = false;
+}
+
+/**
+ * Close whitelist modal.
+ */
+function closeWhitelistModal() {
+  whitelistModal.hidden = true;
+}
+
+/**
+ * Reset whitelist, then jump to Following page and ask user to rescan.
+ */
+async function resetWhitelistAndJumpToFollowing() {
+  const confirmMsg = chrome.i18n.getMessage('whitelistResetConfirm') ||
+    'Reset whitelist now?';
+  if (!window.confirm(confirmMsg)) return;
+
+  currentWhitelist = [];
+  await saveSettings();
+
+  const [tab] = await chrome.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  let username = null;
+  if (tab?.id) {
+    try {
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_SELF_USERNAME' });
+      if (response?.username) username = response.username;
+    } catch {
+      // Ignore when content script is unavailable in current tab.
+    }
+  }
+
+  const followingUrl = username
+    ? `https://x.com/${username}/following`
+    : 'https://x.com/following';
+
+  const doneMsg = chrome.i18n.getMessage('whitelistResetDone') ||
+    'Whitelist reset. Jumping to Following page, please wait a moment for auto-record.';
+  window.alert(doneMsg);
+
+  if (tab?.id) {
+    chrome.tabs.update(tab.id, { url: followingUrl });
+    return;
+  }
+
+  chrome.tabs.create({ url: followingUrl });
+}
+
 // ============================================================
 // Event Listeners
 // ============================================================
@@ -142,6 +221,13 @@ toggleGray.addEventListener('change', saveSettings);
 
 whitelistAddBtn.addEventListener('click', addToWhitelist);
 whitelistRemoveBtn.addEventListener('click', removeFromWhitelistByInput);
+whitelistViewBtn.addEventListener('click', viewWhitelist);
+whitelistResetBtn.addEventListener('click', resetWhitelistAndJumpToFollowing);
+whitelistModalCloseBtn.addEventListener('click', closeWhitelistModal);
+
+whitelistModal.addEventListener('click', (e) => {
+  if (e.target === whitelistModal) closeWhitelistModal();
+});
 
 whitelistInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') addToWhitelist();
@@ -149,6 +235,10 @@ whitelistInput.addEventListener('keydown', (e) => {
 
 whitelistRemoveInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') removeFromWhitelistByInput();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !whitelistModal.hidden) closeWhitelistModal();
 });
 
 // ============================================================

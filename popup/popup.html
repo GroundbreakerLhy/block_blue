@@ -87,6 +87,14 @@
       />
       <button id="whitelist-remove-btn" type="button" class="block-blue-btn-remove" data-i18n="whitelistRemove"></button>
     </div>
+
+    <div class="block-blue-reset-row">
+      <button id="whitelist-view-btn" type="button" class="block-blue-btn-view" data-i18n="whitelistView"></button>
+    </div>
+
+    <div class="block-blue-reset-row">
+      <button id="whitelist-reset-btn" type="button" class="block-blue-btn-reset" data-i18n="whitelistReset"></button>
+    </div>
   </section>
 
   <!-- Stats -->
@@ -97,6 +105,16 @@
       <span data-i18n="statsItems"></span>
     </div>
   </section>
+
+  <div id="whitelist-modal" class="block-blue-modal" hidden>
+    <div class="block-blue-modal-panel">
+      <div class="block-blue-modal-header">
+        <h3 data-i18n="whitelistViewTitle"></h3>
+        <button id="whitelist-modal-close" type="button" class="block-blue-modal-close">×</button>
+      </div>
+      <pre id="whitelist-modal-content" class="block-blue-modal-content"></pre>
+    </div>
+  </div>
 
   <script src="popup.js"></script>
 </body>

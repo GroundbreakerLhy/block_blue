@@ -35,6 +35,24 @@
   "whitelistRemove": {
     "message": "移除"
   },
+  "whitelistView": {
+    "message": "查看白名单"
+  },
+  "whitelistViewTitle": {
+    "message": "当前白名单："
+  },
+  "whitelistViewEmpty": {
+    "message": "白名单为空。"
+  },
+  "whitelistReset": {
+    "message": "重置白名单"
+  },
+  "whitelistResetConfirm": {
+    "message": "确认立即重置白名单吗？"
+  },
+  "whitelistResetDone": {
+    "message": "白名单已重置，正在跳转 Following 页面，请停留几秒用于重新记录白名单用户。"
+  },
   "statsBlocked": {
     "message": "已屏蔽"
   },

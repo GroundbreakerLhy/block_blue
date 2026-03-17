@@ -35,6 +35,24 @@
   "whitelistRemove": {
     "message": "Remove"
   },
+  "whitelistView": {
+    "message": "View Whitelist"
+  },
+  "whitelistViewTitle": {
+    "message": "Current whitelist:"
+  },
+  "whitelistViewEmpty": {
+    "message": "Whitelist is empty."
+  },
+  "whitelistReset": {
+    "message": "Reset Whitelist"
+  },
+  "whitelistResetConfirm": {
+    "message": "Reset the whitelist now?"
+  },
+  "whitelistResetDone": {
+    "message": "Whitelist has been reset. Jumping to Following page, please stay there for a few seconds to re-record whitelist users."
+  },
   "statsBlocked": {
     "message": "Blocked"
   },
