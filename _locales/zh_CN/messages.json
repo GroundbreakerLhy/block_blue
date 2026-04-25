@@ -87,5 +87,14 @@
   },
   "placeholderShow": {
     "message": "点击显示"
+  },
+  "sessionUnblockButton": {
+    "message": "临时取消屏蔽"
+  },
+  "sessionUnblockRestore": {
+    "message": "恢复屏蔽"
+  },
+  "sessionUnblockActive": {
+    "message": "已取消屏蔽，再次点击可恢复"
   }
 }

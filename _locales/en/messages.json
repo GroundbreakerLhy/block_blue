@@ -87,5 +87,14 @@
   },
   "placeholderShow": {
     "message": "Click to show"
+  },
+  "sessionUnblockButton": {
+    "message": "Temporarily Unblock"
+  },
+  "sessionUnblockActive": {
+    "message": "Unblocked until refresh"
+  },
+  "sessionUnblockRestore": {
+    "message": "Restore Blocking"
   }
 }

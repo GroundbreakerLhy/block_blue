@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 // ============================================================
 // Extension Context Guard
@@ -20,52 +20,49 @@ function isContextValid() {
 // ============================================================
 
 /** Attribute marking an element as already scanned */
-const PROCESSED_ATTR = 'data-block-blue-processed';
+const PROCESSED_ATTR = "data-block-blue-processed";
 
 /** Attribute marking an element as replaced with a placeholder */
-const REPLACED_ATTR = 'data-block-blue-replaced';
+const REPLACED_ATTR = "data-block-blue-replaced";
 
 /** CSS selectors for containers that may hold verified badges */
-const SELECTORS = [
-  '[data-testid="tweet"]',
-  '[data-testid="UserCell"]',
-];
+const SELECTORS = ['[data-testid="tweet"]', '[data-testid="UserCell"]'];
 
 /**
  * Partial aria-label keywords used by Twitter for the verified badge
  * across different locales (case-insensitive matching).
  */
 const VERIFIED_KEYWORDS = [
-  'verified',
-  '認証済み',
-  '已验证',
-  '已認證',
-  'verifiziert',
-  'vérifié',
-  'verificado',
-  'verificato',
-  '인증',
+  "verified",
+  "認証済み",
+  "已验证",
+  "已認證",
+  "verifiziert",
+  "vérifié",
+  "verificado",
+  "verificato",
+  "인증",
 ];
 
 /** Keywords that indicate the logged-in user is following someone */
 const FOLLOWING_KEYWORDS = [
-  'following',       // en
-  'フォロー中',      // ja
-  '正在关注',        // zh-CN
-  '正在關注',        // zh-TW
-  'siguiendo',       // es
-  'suivi',           // fr
-  'folge ich',       // de
-  'seguindo',        // pt
-  'segui già',       // it
-  '팔로잉',          // ko
+  "following", // en
+  "フォロー中", // ja
+  "正在关注", // zh-CN
+  "正在關注", // zh-TW
+  "siguiendo", // es
+  "suivi", // fr
+  "folge ich", // de
+  "seguindo", // pt
+  "segui già", // it
+  "팔로잉", // ko
 ];
 
 /** Enumeration of badge colour types */
 const BADGE_TYPES = Object.freeze({
-  BLUE: 'blue',
-  GOLD: 'gold',
-  GRAY: 'gray',
+  BLUE: "blue",
+  GOLD: "gold",
+  GRAY: "gray",
 });
 
 // ============================================================
@@ -96,6 +93,9 @@ let saveTimer = null;
 /** Flag to skip onChanged events triggered by our own whitelist saves */
 let _selfSavingWhitelist = false;
 
+/** Session-only pause flag. Resets naturally when the page is refreshed. */
+let sessionUnblocked = false;
+
 // ============================================================
 // Default settings (also used as keys for chrome.storage.sync)
 // ============================================================
@@ -119,7 +119,9 @@ const DEFAULT_SETTINGS = Object.freeze({
  * @returns {string[]}
  */
 function sortWhitelist(list) {
-  return [...list].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+  return [...list].sort((a, b) =>
+    a.localeCompare(b, "en", { sensitivity: "base" }),
+  );
 }
 
 /**
@@ -133,9 +135,11 @@ async function loadSettings() {
   settings.hideBlue = result.hideBlue;
   settings.hideGold = result.hideGold;
   settings.hideGray = result.hideGray;
-  settings.whitelist = sortWhitelist(Array.isArray(result.whitelist) ? result.whitelist : []);
-  whitelistSet = new Set(settings.whitelist.map(u => u.toLowerCase()));
-  hiddenCount = typeof result.hiddenCount === 'number' ? result.hiddenCount : 0;
+  settings.whitelist = sortWhitelist(
+    Array.isArray(result.whitelist) ? result.whitelist : [],
+  );
+  whitelistSet = new Set(settings.whitelist.map((u) => u.toLowerCase()));
+  hiddenCount = typeof result.hiddenCount === "number" ? result.hiddenCount : 0;
 }
 
 /**
@@ -147,6 +151,57 @@ function debouncedSaveHiddenCount() {
     if (!isContextValid()) return;
     chrome.storage.sync.set({ hiddenCount });
   }, 1000);
+}
+
+// ============================================================
+// Session-only temporary unblock
+// ============================================================
+
+/**
+ * Restore all placeholders and pause all processing until the user restores it
+ * from the popup or refreshes the page.
+ */
+function pauseBlockingForSession() {
+  if (sessionUnblocked) return;
+
+  sessionUnblocked = true;
+  stopObserver();
+
+  document.querySelectorAll(`[${REPLACED_ATTR}]`).forEach((el) => {
+    restoreElement(el);
+  });
+
+  document.querySelectorAll(`[${PROCESSED_ATTR}]`).forEach((el) => {
+    el.removeAttribute(PROCESSED_ATTR);
+  });
+
+  hiddenCount = 0;
+  debouncedSaveHiddenCount();
+}
+
+/**
+ * Resume blocking in this page session and immediately rescan the page.
+ */
+function resumeBlockingForSession() {
+  if (!sessionUnblocked) return;
+
+  sessionUnblocked = false;
+  rescanAll();
+}
+
+/**
+ * Toggle temporary unblock state from the popup.
+ *
+ * @returns {boolean} Whether temporary unblock is active after toggling.
+ */
+function toggleBlockingForSession() {
+  if (sessionUnblocked) {
+    resumeBlockingForSession();
+  } else {
+    pauseBlockingForSession();
+  }
+
+  return sessionUnblocked;
 }
 
 // ============================================================
@@ -162,16 +217,16 @@ function debouncedSaveHiddenCount() {
  * @returns {boolean}
  */
 function isVerifiedBadge(svg) {
-  if (!svg || svg.tagName.toLowerCase() !== 'svg') return false;
+  if (!svg || svg.tagName.toLowerCase() !== "svg") return false;
 
   // Primary: aria-label contains a known "verified" keyword
-  const label = (svg.getAttribute('aria-label') || '').toLowerCase();
-  if (label && VERIFIED_KEYWORDS.some(kw => label.includes(kw))) return true;
+  const label = (svg.getAttribute("aria-label") || "").toLowerCase();
+  if (label && VERIFIED_KEYWORDS.some((kw) => label.includes(kw))) return true;
 
   // Fallback: structural check — the Twitter badge is a 22×22 SVG with ≥2 <path>s
   if (
-    svg.getAttribute('viewBox') === '0 0 22 22' &&
-    svg.querySelectorAll('path').length >= 2
+    svg.getAttribute("viewBox") === "0 0 22 22" &&
+    svg.querySelectorAll("path").length >= 2
   ) {
     return true;
   }
@@ -201,12 +256,7 @@ function getBadgeColorType(svg) {
   if (r > 180 && g > 140 && b < 80) return BADGE_TYPES.GOLD;
 
   // Gray badge — approximately equal RGB channels in the mid range
-  if (
-    Math.abs(r - g) < 40 &&
-    Math.abs(g - b) < 40 &&
-    r > 70 &&
-    r < 200
-  ) {
+  if (Math.abs(r - g) < 40 && Math.abs(g - b) < 40 && r > 70 && r < 200) {
     return BADGE_TYPES.GRAY;
   }
 
@@ -227,7 +277,7 @@ function getBadgeColorType(svg) {
 function extractUsername(element) {
   const links = element.querySelectorAll('a[role="link"][href]');
   for (const link of links) {
-    const href = link.getAttribute('href');
+    const href = link.getAttribute("href");
     if (!href) continue;
     const m = href.match(/^\/([a-zA-Z0-9_]{1,15})$/);
     if (m) return m[1].toLowerCase();
@@ -271,7 +321,7 @@ function addToWhitelist(username) {
 function removeFromWhitelist(username) {
   if (!username || !whitelistSet.has(username)) return false;
   whitelistSet.delete(username);
-  settings.whitelist = settings.whitelist.filter(u => u !== username);
+  settings.whitelist = settings.whitelist.filter((u) => u !== username);
   settings.whitelist = sortWhitelist(settings.whitelist);
   return true;
 }
@@ -290,8 +340,8 @@ function isFollowedInElement(element) {
   // Button whose text matches "Following" keywords (works on UserCells)
   const buttons = element.querySelectorAll('[role="button"]');
   for (const btn of buttons) {
-    const text = (btn.textContent || '').trim().toLowerCase();
-    if (FOLLOWING_KEYWORDS.some(kw => text === kw.toLowerCase())) {
+    const text = (btn.textContent || "").trim().toLowerCase();
+    if (FOLLOWING_KEYWORDS.some((kw) => text === kw.toLowerCase())) {
       return true;
     }
   }
@@ -320,8 +370,8 @@ function isOnFollowingTab() {
 
   const tabs = document.querySelectorAll('[role="tab"][aria-selected="true"]');
   for (const tab of tabs) {
-    const text = (tab.textContent || '').trim().toLowerCase();
-    if (FOLLOWING_KEYWORDS.some(kw => text.includes(kw.toLowerCase()))) {
+    const text = (tab.textContent || "").trim().toLowerCase();
+    if (FOLLOWING_KEYWORDS.some((kw) => text.includes(kw.toLowerCase()))) {
       return true;
     }
   }
@@ -334,44 +384,56 @@ function isOnFollowingTab() {
  * follow/unfollow actions by the user.
  */
 function setupFollowClickListener() {
-  document.addEventListener('click', (e) => {
-    // Detect click on an unfollow button → user is about to unfollow
-    const unfollowBtn = e.target.closest('[data-testid$="-unfollow"]');
-    if (unfollowBtn) {
-      const match = (unfollowBtn.getAttribute('data-testid') || '').match(/^(.+)-unfollow$/);
-      if (match?.[1]) {
-        const username = match[1].toLowerCase();
-        // Twitter shows a confirmation dialog; wait for it to be dismissed
-        setTimeout(() => {
-          if (!isContextValid()) return;
-          // If the unfollow button is gone → unfollow was confirmed
-          if (!document.querySelector(
-            `[data-testid="${match[1]}-unfollow"], [data-testid="${username}-unfollow"]`
-          )) {
-            if (removeFromWhitelist(username)) {
-              saveWhitelistNow();
-              rescanAll();
+  document.addEventListener(
+    "click",
+    (e) => {
+      // Detect click on an unfollow button → user is about to unfollow
+      const unfollowBtn = e.target.closest('[data-testid$="-unfollow"]');
+      if (unfollowBtn) {
+        const match = (unfollowBtn.getAttribute("data-testid") || "").match(
+          /^(.+)-unfollow$/,
+        );
+        if (match?.[1]) {
+          const username = match[1].toLowerCase();
+          // Twitter shows a confirmation dialog; wait for it to be dismissed
+          setTimeout(() => {
+            if (!isContextValid()) return;
+            // If the unfollow button is gone → unfollow was confirmed
+            if (
+              !document.querySelector(
+                `[data-testid="${match[1]}-unfollow"], [data-testid="${username}-unfollow"]`,
+              )
+            ) {
+              if (removeFromWhitelist(username)) {
+                saveWhitelistNow();
+                rescanAll();
+              }
             }
-          }
-        }, 2000);
+          }, 2000);
+        }
+        return;
       }
-      return;
-    }
 
-    // Detect click on a follow button → user is about to follow
-    const followBtn = e.target.closest('[data-testid$="-follow"]:not([data-testid$="-unfollow"])');
-    if (followBtn) {
-      const match = (followBtn.getAttribute('data-testid') || '').match(/^(.+)-follow$/);
-      if (match?.[1]) {
-        const username = match[1].toLowerCase();
-        // Follow is instant (no dialog) — save immediately
-        if (addToWhitelist(username)) {
-          saveWhitelistNow();
-          rescanAll();
+      // Detect click on a follow button → user is about to follow
+      const followBtn = e.target.closest(
+        '[data-testid$="-follow"]:not([data-testid$="-unfollow"])',
+      );
+      if (followBtn) {
+        const match = (followBtn.getAttribute("data-testid") || "").match(
+          /^(.+)-follow$/,
+        );
+        if (match?.[1]) {
+          const username = match[1].toLowerCase();
+          // Follow is instant (no dialog) — save immediately
+          if (addToWhitelist(username)) {
+            saveWhitelistNow();
+            rescanAll();
+          }
         }
       }
-    }
-  }, true);
+    },
+    true,
+  );
 }
 
 // ============================================================
@@ -382,9 +444,9 @@ function setupFollowClickListener() {
  * Badge-type → display label mapping.
  */
 const BADGE_LABELS = Object.freeze({
-  [BADGE_TYPES.BLUE]: chrome.i18n.getMessage('badgeBlue'),
-  [BADGE_TYPES.GOLD]: chrome.i18n.getMessage('badgeGold'),
-  [BADGE_TYPES.GRAY]: chrome.i18n.getMessage('badgeGray'),
+  [BADGE_TYPES.BLUE]: chrome.i18n.getMessage("badgeBlue"),
+  [BADGE_TYPES.GOLD]: chrome.i18n.getMessage("badgeGold"),
+  [BADGE_TYPES.GRAY]: chrome.i18n.getMessage("badgeGray"),
 });
 
 /**
@@ -405,31 +467,32 @@ function replaceWithPlaceholder(element, badgeType) {
   element._blockBlueOriginal = fragment;
   element._blockBlueOriginalPadding = element.style.padding;
 
-  element.setAttribute(REPLACED_ATTR, 'true');
+  element.setAttribute(REPLACED_ATTR, "true");
 
   // Build placeholder bar
-  const bar = document.createElement('div');
-  bar.className = 'block-blue-placeholder';
+  const bar = document.createElement("div");
+  bar.className = "block-blue-placeholder";
 
   // Badge colour dot
-  const dot = document.createElement('span');
+  const dot = document.createElement("span");
   dot.className = `block-blue-placeholder-dot block-blue-placeholder-dot--${badgeType}`;
   bar.appendChild(dot);
 
   // Text
-  const label = BADGE_LABELS[badgeType] || chrome.i18n.getMessage('badgeVerified');
-  const text = document.createElement('span');
-  text.textContent = chrome.i18n.getMessage('placeholderBlocked', [label]);
+  const label =
+    BADGE_LABELS[badgeType] || chrome.i18n.getMessage("badgeVerified");
+  const text = document.createElement("span");
+  text.textContent = chrome.i18n.getMessage("placeholderBlocked", [label]);
   bar.appendChild(text);
 
   // "Show" link (visible on hover)
-  const show = document.createElement('span');
-  show.className = 'block-blue-placeholder-show';
-  show.textContent = chrome.i18n.getMessage('placeholderShow');
+  const show = document.createElement("span");
+  show.className = "block-blue-placeholder-show";
+  show.textContent = chrome.i18n.getMessage("placeholderShow");
   bar.appendChild(show);
 
   // Click to reveal
-  bar.addEventListener('click', () => {
+  bar.addEventListener("click", () => {
     restoreElement(element);
   });
 
@@ -446,10 +509,10 @@ function restoreElement(element) {
   if (!original) return;
 
   // Remove placeholder
-  element.innerHTML = '';
+  element.innerHTML = "";
   element.appendChild(original);
   element.removeAttribute(REPLACED_ATTR);
-  element.style.padding = element._blockBlueOriginalPadding || '';
+  element.style.padding = element._blockBlueOriginalPadding || "";
 
   delete element._blockBlueOriginal;
   delete element._blockBlueOriginalPadding;
@@ -476,9 +539,9 @@ function restoreElement(element) {
  * @returns {string|null}  One of BADGE_TYPES values, or null.
  */
 function getBlockBadgeType(element) {
-  if (!settings.enabled) return null;
+  if (!settings.enabled || sessionUnblocked) return null;
 
-  const svgs = element.querySelectorAll('svg');
+  const svgs = element.querySelectorAll("svg");
   let badgeType = null;
 
   for (const svg of svgs) {
@@ -536,7 +599,7 @@ function getBlockBadgeType(element) {
 function processElement(element) {
   // Skip already-processed elements
   if (element.getAttribute(PROCESSED_ATTR)) return;
-  element.setAttribute(PROCESSED_ATTR, 'true');
+  element.setAttribute(PROCESSED_ATTR, "true");
 
   const badgeType = getBlockBadgeType(element);
   if (badgeType) {
@@ -553,7 +616,7 @@ function processElement(element) {
 function processTree(root) {
   if (!(root instanceof HTMLElement)) return;
 
-  const selectorString = SELECTORS.join(', ');
+  const selectorString = SELECTORS.join(", ");
 
   // The root itself might be a target
   if (root.matches && root.matches(selectorString)) {
@@ -575,17 +638,17 @@ function processTree(root) {
  */
 function rescanAll() {
   // Restore any placeholder-replaced elements back to original content
-  document.querySelectorAll(`[${REPLACED_ATTR}]`).forEach(el => {
+  document.querySelectorAll(`[${REPLACED_ATTR}]`).forEach((el) => {
     restoreElement(el);
   });
   // Clear processed markers
-  document.querySelectorAll(`[${PROCESSED_ATTR}]`).forEach(el => {
+  document.querySelectorAll(`[${PROCESSED_ATTR}]`).forEach((el) => {
     el.removeAttribute(PROCESSED_ATTR);
   });
 
   hiddenCount = 0;
 
-  if (settings.enabled) {
+  if (settings.enabled && !sessionUnblocked) {
     processTree(document.body);
     startObserver();
   } else {
@@ -608,7 +671,7 @@ function rescanAll() {
  * @param {MutationRecord[]} mutations
  */
 function handleMutations(mutations) {
-  if (!settings.enabled || !isContextValid()) return;
+  if (!settings.enabled || sessionUnblocked || !isContextValid()) return;
 
   for (const mutation of mutations) {
     for (const node of mutation.addedNodes) {
@@ -675,7 +738,7 @@ function setupUrlChangeDetection() {
     onUrlChange();
   };
 
-  window.addEventListener('popstate', onUrlChange);
+  window.addEventListener("popstate", onUrlChange);
 }
 
 // ============================================================
@@ -688,20 +751,28 @@ function setupUrlChangeDetection() {
 function setupMessageListener() {
   if (!isContextValid()) return;
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message.type === 'GET_STATS') {
-      sendResponse({ hiddenCount });
+    if (message.type === "GET_STATS") {
+      sendResponse({ hiddenCount, sessionUnblocked });
       return true; // keep channel open for async response
     }
 
-    if (message.type === 'SETTINGS_CHANGED') {
+    if (message.type === "SETTINGS_CHANGED") {
       loadSettings().then(() => rescanAll());
       sendResponse({ ok: true });
       return true;
     }
 
-    if (message.type === 'GET_SELF_USERNAME') {
-      const profileLink = document.querySelector('a[data-testid="AppTabBar_Profile_Link"][href]');
-      const href = profileLink ? profileLink.getAttribute('href') : '';
+    if (message.type === "PAUSE_BLOCKING_FOR_SESSION") {
+      const active = toggleBlockingForSession();
+      sendResponse({ ok: true, sessionUnblocked: active });
+      return true;
+    }
+
+    if (message.type === "GET_SELF_USERNAME") {
+      const profileLink = document.querySelector(
+        'a[data-testid="AppTabBar_Profile_Link"][href]',
+      );
+      const href = profileLink ? profileLink.getAttribute("href") : "";
       const match = href ? href.match(/^\/([a-zA-Z0-9_]{1,15})$/) : null;
       sendResponse({ username: match ? match[1].toLowerCase() : null });
       return true;
@@ -721,12 +792,13 @@ function setupMessageListener() {
 function setupStorageListener() {
   if (!isContextValid()) return;
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'sync') return;
+    if (area !== "sync") return;
 
     const keys = Object.keys(changes);
     // Skip internal saves (hiddenCount or our own whitelist sync)
-    if (keys.length === 1 && keys[0] === 'hiddenCount') return;
-    if (_selfSavingWhitelist && keys.length === 1 && keys[0] === 'whitelist') return;
+    if (keys.length === 1 && keys[0] === "hiddenCount") return;
+    if (_selfSavingWhitelist && keys.length === 1 && keys[0] === "whitelist")
+      return;
 
     loadSettings().then(() => rescanAll());
   });
@@ -751,7 +823,7 @@ async function init() {
       if (addToWhitelist(u)) migrated = true;
     }
     if (migrated) saveWhitelistNow();
-    chrome.storage.local.remove('followedUsers');
+    chrome.storage.local.remove("followedUsers");
   }
 
   // Listeners are always active so the plugin can be toggled at runtime

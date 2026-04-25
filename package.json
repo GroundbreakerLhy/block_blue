@@ -1,0 +1,16 @@
+{
+  "name": "block-blue",
+  "version": "0.4.0",
+  "private": true,
+  "description": "Hide Twitter/X verified users from your timeline",
+  "scripts": {
+    "release": "node scripts/release.js",
+    "release:patch": "node scripts/release.js patch",
+    "release:minor": "node scripts/release.js minor",
+    "release:major": "node scripts/release.js major",
+    "build": "bash build.sh"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

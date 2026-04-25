@@ -1,25 +1,28 @@
-'use strict';
+"use strict";
 
 // ============================================================
 // DOM References
 // ============================================================
 
-const toggleEnabled = document.getElementById('toggle-enabled');
-const toggleBlue = document.getElementById('toggle-blue');
-const toggleGold = document.getElementById('toggle-gold');
-const toggleGray = document.getElementById('toggle-gray');
+const toggleEnabled = document.getElementById("toggle-enabled");
+const toggleBlue = document.getElementById("toggle-blue");
+const toggleGold = document.getElementById("toggle-gold");
+const toggleGray = document.getElementById("toggle-gray");
 
-const whitelistInput = document.getElementById('whitelist-input');
-const whitelistAddBtn = document.getElementById('whitelist-add');
-const whitelistRemoveInput = document.getElementById('whitelist-remove-input');
-const whitelistRemoveBtn = document.getElementById('whitelist-remove-btn');
-const whitelistViewBtn = document.getElementById('whitelist-view-btn');
-const whitelistResetBtn = document.getElementById('whitelist-reset-btn');
-const whitelistModal = document.getElementById('whitelist-modal');
-const whitelistModalContent = document.getElementById('whitelist-modal-content');
-const whitelistModalCloseBtn = document.getElementById('whitelist-modal-close');
+const whitelistInput = document.getElementById("whitelist-input");
+const whitelistAddBtn = document.getElementById("whitelist-add");
+const whitelistRemoveInput = document.getElementById("whitelist-remove-input");
+const whitelistRemoveBtn = document.getElementById("whitelist-remove-btn");
+const whitelistViewBtn = document.getElementById("whitelist-view-btn");
+const whitelistResetBtn = document.getElementById("whitelist-reset-btn");
+const temporaryUnblockBtn = document.getElementById("temporary-unblock-btn");
+const whitelistModal = document.getElementById("whitelist-modal");
+const whitelistModalContent = document.getElementById(
+  "whitelist-modal-content",
+);
+const whitelistModalCloseBtn = document.getElementById("whitelist-modal-close");
 
-const hiddenCountEl = document.getElementById('hidden-count');
+const hiddenCountEl = document.getElementById("hidden-count");
 
 // ============================================================
 // Default Settings
@@ -41,7 +44,9 @@ let currentWhitelist = [];
  * Keep whitelist order stable for display and storage.
  */
 function sortWhitelist(list) {
-  return [...list].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+  return [...list].sort((a, b) =>
+    a.localeCompare(b, "en", { sensitivity: "base" }),
+  );
 }
 
 // ============================================================
@@ -59,7 +64,9 @@ async function loadSettings() {
   toggleGold.checked = data.hideGold;
   toggleGray.checked = data.hideGray;
 
-  currentWhitelist = sortWhitelist(Array.isArray(data.whitelist) ? data.whitelist : []);
+  currentWhitelist = sortWhitelist(
+    Array.isArray(data.whitelist) ? data.whitelist : [],
+  );
   hiddenCountEl.textContent = data.hiddenCount || 0;
 }
 
@@ -92,7 +99,46 @@ async function notifyContentScript() {
   if (!tab?.id) return;
 
   // Ignore errors when the content script isn't injected (non-Twitter tabs)
-  chrome.tabs.sendMessage(tab.id, { type: 'SETTINGS_CHANGED' }).catch(() => {});
+  chrome.tabs.sendMessage(tab.id, { type: "SETTINGS_CHANGED" }).catch(() => {});
+}
+
+/**
+ * Get the popup button text for the current temporary unblock state.
+ */
+function getTemporaryUnblockButtonText(active) {
+  return chrome.i18n.getMessage(
+    active ? "sessionUnblockRestore" : "sessionUnblockButton",
+  );
+}
+
+/**
+ * Toggle temporary unblock for the active tab and update the popup button text.
+ */
+async function temporaryUnblockActiveTab() {
+  const [tab] = await chrome.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+  if (!tab?.id) return;
+
+  temporaryUnblockBtn.disabled = true;
+
+  try {
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: "PAUSE_BLOCKING_FOR_SESSION",
+    });
+
+    if (response?.ok) {
+      const active = Boolean(response.sessionUnblocked);
+      temporaryUnblockBtn.textContent = getTemporaryUnblockButtonText(active);
+      temporaryUnblockBtn.classList.toggle("is-active", active);
+      refreshStats();
+    }
+  } catch {
+    // Ignore errors when the content script isn't available.
+  } finally {
+    temporaryUnblockBtn.disabled = false;
+  }
 }
 
 // ============================================================
@@ -103,25 +149,28 @@ async function notifyContentScript() {
  * Add a username to the whitelist (from the input field).
  */
 function addToWhitelist() {
-  const raw = whitelistInput.value.trim().replace(/^@/, '');
+  const raw = whitelistInput.value.trim().replace(/^@/, "");
   if (!raw) return;
 
   if (!/^[a-zA-Z0-9_]{1,15}$/.test(raw)) {
-    whitelistInput.classList.add('block-blue-input-error');
-    setTimeout(() => whitelistInput.classList.remove('block-blue-input-error'), 600);
+    whitelistInput.classList.add("block-blue-input-error");
+    setTimeout(
+      () => whitelistInput.classList.remove("block-blue-input-error"),
+      600,
+    );
     return;
   }
 
   const username = raw.toLowerCase();
 
   if (currentWhitelist.includes(username)) {
-    whitelistInput.value = '';
+    whitelistInput.value = "";
     return;
   }
 
   currentWhitelist.push(username);
   currentWhitelist = sortWhitelist(currentWhitelist);
-  whitelistInput.value = '';
+  whitelistInput.value = "";
   saveSettings();
 }
 
@@ -129,20 +178,23 @@ function addToWhitelist() {
  * Remove a username from the whitelist (from the remove input field).
  */
 function removeFromWhitelistByInput() {
-  const raw = whitelistRemoveInput.value.trim().replace(/^@/, '');
+  const raw = whitelistRemoveInput.value.trim().replace(/^@/, "");
   if (!raw) return;
 
   const username = raw.toLowerCase();
   const idx = currentWhitelist.indexOf(username);
 
   if (idx === -1) {
-    whitelistRemoveInput.classList.add('block-blue-input-error');
-    setTimeout(() => whitelistRemoveInput.classList.remove('block-blue-input-error'), 600);
+    whitelistRemoveInput.classList.add("block-blue-input-error");
+    setTimeout(
+      () => whitelistRemoveInput.classList.remove("block-blue-input-error"),
+      600,
+    );
     return;
   }
 
   currentWhitelist.splice(idx, 1);
-  whitelistRemoveInput.value = '';
+  whitelistRemoveInput.value = "";
   saveSettings();
 }
 
@@ -151,12 +203,15 @@ function removeFromWhitelistByInput() {
  */
 function viewWhitelist() {
   if (currentWhitelist.length === 0) {
-    const emptyMsg = chrome.i18n.getMessage('whitelistViewEmpty') || 'Whitelist is empty.';
+    const emptyMsg =
+      chrome.i18n.getMessage("whitelistViewEmpty") || "Whitelist is empty.";
     window.alert(emptyMsg);
     return;
   }
 
-  const listText = currentWhitelist.map(username => `@${username}`).join('\n');
+  const listText = currentWhitelist
+    .map((username) => `@${username}`)
+    .join("\n");
   whitelistModalContent.textContent = listText;
   whitelistModal.hidden = false;
 }
@@ -172,8 +227,8 @@ function closeWhitelistModal() {
  * Reset whitelist, then jump to Following page and ask user to rescan.
  */
 async function resetWhitelistAndJumpToFollowing() {
-  const confirmMsg = chrome.i18n.getMessage('whitelistResetConfirm') ||
-    'Reset whitelist now?';
+  const confirmMsg =
+    chrome.i18n.getMessage("whitelistResetConfirm") || "Reset whitelist now?";
   if (!window.confirm(confirmMsg)) return;
 
   currentWhitelist = [];
@@ -187,7 +242,9 @@ async function resetWhitelistAndJumpToFollowing() {
   let username = null;
   if (tab?.id) {
     try {
-      const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_SELF_USERNAME' });
+      const response = await chrome.tabs.sendMessage(tab.id, {
+        type: "GET_SELF_USERNAME",
+      });
       if (response?.username) username = response.username;
     } catch {
       // Ignore when content script is unavailable in current tab.
@@ -196,10 +253,11 @@ async function resetWhitelistAndJumpToFollowing() {
 
   const followingUrl = username
     ? `https://x.com/${username}/following`
-    : 'https://x.com/following';
+    : "https://x.com/following";
 
-  const doneMsg = chrome.i18n.getMessage('whitelistResetDone') ||
-    'Whitelist reset. Jumping to Following page, please wait a moment for auto-record.';
+  const doneMsg =
+    chrome.i18n.getMessage("whitelistResetDone") ||
+    "Whitelist reset. Jumping to Following page, please wait a moment for auto-record.";
   window.alert(doneMsg);
 
   if (tab?.id) {
@@ -214,31 +272,32 @@ async function resetWhitelistAndJumpToFollowing() {
 // Event Listeners
 // ============================================================
 
-toggleEnabled.addEventListener('change', saveSettings);
-toggleBlue.addEventListener('change', saveSettings);
-toggleGold.addEventListener('change', saveSettings);
-toggleGray.addEventListener('change', saveSettings);
+toggleEnabled.addEventListener("change", saveSettings);
+toggleBlue.addEventListener("change", saveSettings);
+toggleGold.addEventListener("change", saveSettings);
+toggleGray.addEventListener("change", saveSettings);
 
-whitelistAddBtn.addEventListener('click', addToWhitelist);
-whitelistRemoveBtn.addEventListener('click', removeFromWhitelistByInput);
-whitelistViewBtn.addEventListener('click', viewWhitelist);
-whitelistResetBtn.addEventListener('click', resetWhitelistAndJumpToFollowing);
-whitelistModalCloseBtn.addEventListener('click', closeWhitelistModal);
+whitelistAddBtn.addEventListener("click", addToWhitelist);
+whitelistRemoveBtn.addEventListener("click", removeFromWhitelistByInput);
+whitelistViewBtn.addEventListener("click", viewWhitelist);
+whitelistResetBtn.addEventListener("click", resetWhitelistAndJumpToFollowing);
+temporaryUnblockBtn?.addEventListener("click", temporaryUnblockActiveTab);
+whitelistModalCloseBtn.addEventListener("click", closeWhitelistModal);
 
-whitelistModal.addEventListener('click', (e) => {
+whitelistModal.addEventListener("click", (e) => {
   if (e.target === whitelistModal) closeWhitelistModal();
 });
 
-whitelistInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') addToWhitelist();
+whitelistInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") addToWhitelist();
 });
 
-whitelistRemoveInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') removeFromWhitelistByInput();
+whitelistRemoveInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") removeFromWhitelistByInput();
 });
 
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !whitelistModal.hidden) closeWhitelistModal();
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !whitelistModal.hidden) closeWhitelistModal();
 });
 
 // ============================================================
@@ -255,10 +314,17 @@ async function refreshStats() {
   });
   if (!tab?.id) return;
 
-  chrome.tabs.sendMessage(tab.id, { type: 'GET_STATS' })
-    .then(response => {
-      if (response && typeof response.hiddenCount === 'number') {
+  chrome.tabs
+    .sendMessage(tab.id, { type: "GET_STATS" })
+    .then((response) => {
+      if (response && typeof response.hiddenCount === "number") {
         hiddenCountEl.textContent = response.hiddenCount;
+      }
+
+      if (response && typeof response.sessionUnblocked === "boolean") {
+        const active = response.sessionUnblocked;
+        temporaryUnblockBtn.textContent = getTemporaryUnblockButtonText(active);
+        temporaryUnblockBtn.classList.toggle("is-active", active);
       }
     })
     .catch(() => {
@@ -274,7 +340,7 @@ async function refreshStats() {
  * Populate all elements with `data-i18n` attribute using chrome.i18n.
  */
 function applyI18n() {
-  document.querySelectorAll('[data-i18n]').forEach(el => {
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
     const key = el.dataset.i18n;
     const msg = chrome.i18n.getMessage(key);
     if (msg) el.textContent = msg;
